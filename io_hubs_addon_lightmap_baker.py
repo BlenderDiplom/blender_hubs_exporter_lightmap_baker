@@ -40,39 +40,47 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
     def execute(self, context):
         # Check selected objects
         selected_objects = bpy.context.selected_objects
+        # Filter mesh objects
+        mesh_objs = [ob for ob in selected_objects if ob.type == 'MESH']
 
         # set up UV layer structure. The first layer has to be UV0, the second one UV1 for the lightmap
-        for obj in selected_objects:
-            if obj.type == 'MESH':
-                obj_uv_layers = obj.data.uv_layers
-                # Check whether there are any UV layers and if not, create the two that are required
-                if len(obj_uv_layers) == 0:
-                    obj_uv_layers.new(name='UV0')
-                    obj_uv_layers.new(name='UV1')
-                # The first layer is usually used for regular texturing so don't touch it, just rename it.
-                # Check if object has a first UV layer named "UV0"
-                elif obj_uv_layers[0].name != 'UV0':
-                    # Rename the first UV layer to "UV0"                    
-                    obj_uv_layers[0].name = 'UV0'
+        for obj in mesh_objs:
+            obj_uv_layers = obj.data.uv_layers
+            # Check whether there are any UV layers and if not, create the two that are required
+            if len(obj_uv_layers) == 0:
+                obj_uv_layers.new(name='UV0')
+                obj_uv_layers.new(name='UV1')
+            # The first layer is usually used for regular texturing so don't touch it, just rename it.
+            # Check if object has a first UV layer named "UV0"
+            elif obj_uv_layers[0].name != 'UV0':
+                # Rename the first UV layer to "UV0"                    
+                obj_uv_layers[0].name = 'UV0'
 
-                if len(obj_uv_layers) == 1:
-                    obj_uv_layers.new(name='UV1')
-                # Check if object has a second UV layer named "UV1"
-                elif obj_uv_layers[1].name != 'UV1':
-                    print("The second UV layer in hubs should be named UV1 and is reserved for the lightmap, all the layers >1 are ignored.")
-                    obj_uv_layers.new(name='UV1')
-                    # The new layer is the last in the list, swap it for position 1
-                    obj_uv_layers[1], obj_uv_layers[-1] = obj_uv_layers[-1], obj_uv_layers[1]
+            if len(obj_uv_layers) == 1:
+                obj_uv_layers.new(name='UV1')
+            # Check if object has a second UV layer named "UV1"
+            elif obj_uv_layers[1].name != 'UV1':
+                print("The second UV layer in hubs should be named UV1 and is reserved for the lightmap, all the layers >1 are ignored.")
+                obj_uv_layers.new(name='UV1')
+                # The new layer is the last in the list, swap it for position 1
+                obj_uv_layers[1], obj_uv_layers[-1] = obj_uv_layers[-1], obj_uv_layers[1]
 
-                # The layer for the lightmap needs to be the active one before lightmap packing
-                obj_uv_layers.active = obj_uv_layers['UV1']
+            # The layer for the lightmap needs to be the active one before lightmap packing
+            obj_uv_layers.active = obj_uv_layers['UV1']
 
         # run UV lightmap packing on all selected objects
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.mesh.select_all(action='SELECT')
+        # TODO: We need to warn the user at some place like the README that the uv_layer[1] gets completely overwritten if it is called 'UV1'
         bpy.ops.uv.lightmap_pack()
 
-        # TODO: Gather all materials on the selected objects
+        # Gather all materials on the selected objects
+        materials = []
+        for obj in mesh_objs:
+            # TODO: Make more efficient
+            for slot in obj.material_slots:
+                if slot.material not in materials:
+                    materials.append(slot.material)
         # TODO: For each material, check wether a node of type 'MOZ_lightmap settings' is present and if yes, check whether it is wired correctly
         # TODO: If that node is not present, add such a node, an image texture node and a UV Map node and wire them correctly    
 
