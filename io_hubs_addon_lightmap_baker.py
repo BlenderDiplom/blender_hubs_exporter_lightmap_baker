@@ -51,15 +51,18 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
                     obj_uv_layers.new(name='UV1')
                 # The first layer is usually used for regular texturing so don't touch it, just rename it.
                 # Check if object has a first UV layer named "UV0"
-                elif obj_uv_layers[0].name is not 'UV0':
+                elif obj_uv_layers[0].name != 'UV0':
                     # Rename the first UV layer to "UV0"                    
                     obj_uv_layers[0].name = 'UV0'
 
                 if len(obj_uv_layers) == 1:
                     obj_uv_layers.new(name='UV1')
                 # Check if object has a second UV layer named "UV1"
-                elif obj_uv_layers[1].name is not 'UV1':
-                    print("The lightmap layer seems to be custom, what to do in this case?")
+                elif obj_uv_layers[1].name != 'UV1':
+                    print("The second UV layer in hubs should be named UV1 and is reserved for the lightmap, all the layers >1 are ignored.")
+                    obj_uv_layers.new(name='UV1')
+                    # The new layer is the last in the list, swap it for position 1
+                    obj_uv_layers[1], obj_uv_layers[-1] = obj_uv_layers[-1], obj_uv_layers[1]
 
                 # The layer for the lightmap needs to be the active one before lightmap packing
                 obj_uv_layers.active = obj_uv_layers['UV1']
