@@ -14,6 +14,9 @@ bl_info = {
     "category": "Generic"
 }
 
+# TODO: Add a check whether the io_hubs_addon is installed and actived in the preferences 
+# https://blender.stackexchange.com/questions/43703/how-to-tell-if-an-add-on-is-present-using-python
+
 class HubsPanel(bpy.types.Panel):
     """Creates a Panel in the Object properties window"""
     bl_label = "Hubs Lightmap Baker"
@@ -27,6 +30,7 @@ class HubsPanel(bpy.types.Panel):
 
         row = layout.row()
         row.operator("object.bake_lightmaps", text="Bake Lightmaps of selected objects")
+        # TODO: Add Property 'Intensity' and default to 3.41
 
 class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
     """Bake Lightmaps for selected objects"""
@@ -65,7 +69,9 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
         bpy.ops.mesh.select_all(action='SELECT')
         bpy.ops.uv.lightmap_pack()
 
-                
+        # TODO: Gather all materials on the selected objects
+        # TODO: For each material, check wether a node of type 'MOZ_lightmap settings' is present and if yes, check whether it is wired correctly
+        # TODO: If that node is not present, add such a node, an image texture node and a UV Map node and wire them correctly    
 
         return {'FINISHED'}
 
