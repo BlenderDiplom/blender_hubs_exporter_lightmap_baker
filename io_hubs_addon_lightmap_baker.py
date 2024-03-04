@@ -1,4 +1,5 @@
 import bpy
+from bpy.props import FloatProperty
 
 bl_info = {
     "name": "Hubs Lightmap Baker",
@@ -30,12 +31,17 @@ class HubsPanel(bpy.types.Panel):
 
         row = layout.row()
         row.operator("object.bake_lightmaps", text="Bake Lightmaps of selected objects")
-        # TODO: Add Property 'Intensity' and default to 3.41
+        # TODO: Add Property 'Default Intensity' and default to 3.41
 
 class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
     """Bake Lightmaps for selected objects"""
     bl_idname = "object.bake_lightmaps"
     bl_label = "Bake Lightmaps"
+
+    default_intensity: FloatProperty(
+        name = "Lightmap Intensity",
+        default = 3.14
+    )
 
     def execute(self, context):
         # Check selected objects
@@ -82,9 +88,35 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
                 if slot.material not in materials:
                     materials.append(slot.material)
         # TODO: For each material, check wether a node of type 'MOZ_lightmap settings' is present and if yes, check whether it is wired correctly
-        # TODO: If that node is not present, add such a node, an image texture node and a UV Map node and wire them correctly    
-
+        for mat in materials:
+            mat_nodes = mat.node_tree.nodes
+            lightmap_nodes = [node for node in mat_nodes if node.type=='MOZ_lightmap settings']
+            if len(lightmap_nodes) > 1:
+                print("Too many lightmap nodes in node tree of material", mat.name)
+            elif len(lightmap_nodes) < 1:
+                # TODO: If that node is not present, add such a node, an image texture node and a UV Map node and wire them correctly
+                self.setup_moz_lightmap_nodes(mat.node_tree)
+            else:
+                # TODO: Check wether all nodes are set up correctly
+                pass
         return {'FINISHED'}
+    
+    def setup_moz_lightmap_nodes(self, node_tree):
+        mat_nodes = node_tree.nodes
+        # This function gets called when no lightmap node is present
+        lightmap_node = mat_nodes.new(type="moz_lightmap.node")
+        lightmap_node.intensity = self.default_intensity
+
+        lightmap_texture_node = mat_nodes.new(type="ShaderNodeTexImage")
+        lightmap_texture_node.location[0] -= 300
+
+        UVmap_node = mat_nodes.new(type="ShaderNodeUVMap")
+        UVmap_node.uv_map = "UV1"
+        UVmap_node.location[0] -= 500
+
+        node_tree.links.new(UVmap_node.outputs['UV'], lightmap_texture_node.inputs['Vector'])
+        node_tree.links.new(lightmap_texture_node.outputs['Color'], lightmap_node.inputs['Lightmap'])
+
 
 def register():
     bpy.utils.register_class(HubsPanel)
