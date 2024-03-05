@@ -1,5 +1,5 @@
 import bpy
-from bpy.props import FloatProperty
+from bpy.props import FloatProperty, IntProperty
 
 bl_info = {
     "name": "Hubs Lightmap Baker",
@@ -39,8 +39,13 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
     bl_label = "Bake Lightmaps"
 
     default_intensity: FloatProperty(
-        name = "Lightmap Intensity",
+        name = "Lightmaps Intensity",
         default = 3.14
+    )
+
+    resolution: IntProperty(
+        name = "Lightmaps Resolution",
+        default = 2048
     )
 
     def execute(self, context):
@@ -79,6 +84,7 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
         bpy.ops.mesh.select_all(action='SELECT')
         # TODO: We need to warn the user at some place like the README that the uv_layer[1] gets completely overwritten if it is called 'UV1'
         bpy.ops.uv.lightmap_pack()
+        bpy.ops.object.mode_set(mode='OBJECT')
 
         # Gather all materials on the selected objects
         materials = []
@@ -87,19 +93,25 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
             for slot in obj.material_slots:
                 if slot.material not in materials:
                     materials.append(slot.material)
-        # TODO: For each material, check wether a node of type 'MOZ_lightmap settings' is present and if yes, check whether it is wired correctly
         for mat in materials:
             mat_nodes = mat.node_tree.nodes
-            lightmap_nodes = [node for node in mat_nodes if node.type=='MOZ_lightmap settings']
+            lightmap_nodes = [node for node in mat_nodes if node.bl_idname=='moz_lightmap.node']
             if len(lightmap_nodes) > 1:
                 print("Too many lightmap nodes in node tree of material", mat.name)
             elif len(lightmap_nodes) < 1:
                 # TODO: If that node is not present, add such a node, an image texture node and a UV Map node and wire them correctly
                 self.setup_moz_lightmap_nodes(mat.node_tree)
             else:
-                # TODO: Check wether all nodes are set up correctly
-                pass
+                # TODO: Check wether all nodes are set up correctly, for now assume they are
+                lightmap_nodes[0].intensity = self.default_intensity
+                # the image texture node needs to be the active one for baking, it is connected to the lightmap node so get it from there
+                lightmap_texture_node = lightmap_nodes[0].inputs[0].links[0].from_node
+                mat.node_tree.nodes.active = lightmap_texture_node
         return {'FINISHED'}
+    
+    def invoke(self, context, event):
+        # needed to get the dialoge with the intensity
+        return context.window_manager.invoke_props_dialog(self)
     
     def setup_moz_lightmap_nodes(self, node_tree):
         mat_nodes = node_tree.nodes
@@ -110,12 +122,18 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
         lightmap_texture_node = mat_nodes.new(type="ShaderNodeTexImage")
         lightmap_texture_node.location[0] -= 300
 
+        img = bpy.data.images.new('LightMap', self.resolution, self.resolution, alpha=False, float_buffer=True)
+        lightmap_texture_node.image = img
+
         UVmap_node = mat_nodes.new(type="ShaderNodeUVMap")
         UVmap_node.uv_map = "UV1"
         UVmap_node.location[0] -= 500
 
         node_tree.links.new(UVmap_node.outputs['UV'], lightmap_texture_node.inputs['Vector'])
         node_tree.links.new(lightmap_texture_node.outputs['Color'], lightmap_node.inputs['Lightmap'])
+
+        # the image texture node needs to be the active one for baking
+        node_tree.nodes.active = lightmap_texture_node
 
 
 def register():
