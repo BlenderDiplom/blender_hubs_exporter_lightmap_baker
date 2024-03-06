@@ -48,6 +48,11 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
         default = 2048
     )
 
+    samples: IntProperty(
+        name = "Max Samples",
+        default = 2048
+    )
+
     def execute(self, context):
         # Check selected objects
         selected_objects = bpy.context.selected_objects
@@ -93,20 +98,48 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
             for slot in obj.material_slots:
                 if slot.material not in materials:
                     materials.append(slot.material)
+        # Check for the required nodes and set them up if not present
+        lightmap_texture_nodes = []
         for mat in materials:
             mat_nodes = mat.node_tree.nodes
             lightmap_nodes = [node for node in mat_nodes if node.bl_idname=='moz_lightmap.node']
             if len(lightmap_nodes) > 1:
                 print("Too many lightmap nodes in node tree of material", mat.name)
             elif len(lightmap_nodes) < 1:
-                # TODO: If that node is not present, add such a node, an image texture node and a UV Map node and wire them correctly
-                self.setup_moz_lightmap_nodes(mat.node_tree)
+                lightmap_texture_nodes.append(self.setup_moz_lightmap_nodes(mat.node_tree))
             else:
                 # TODO: Check wether all nodes are set up correctly, for now assume they are
                 lightmap_nodes[0].intensity = self.default_intensity
                 # the image texture node needs to be the active one for baking, it is connected to the lightmap node so get it from there
                 lightmap_texture_node = lightmap_nodes[0].inputs[0].links[0].from_node
                 mat.node_tree.nodes.active = lightmap_texture_node
+                lightmap_texture_nodes.append(lightmap_texture_node)
+
+        # Baking has to happen in Cycles, it is not supported in EEVEE yet
+        render_engine_tmp = context.scene.render.engine
+        context.scene.render.engine = 'CYCLES'
+        samples_tmp = context.scene.cycles.samples
+        context.scene.cycles.samples = self.samples
+        # Baking needs to happen without the color pass because we only want the direct and indirect light contributions
+        bake_settings = context.scene.render.bake
+        bake_settings.use_pass_direct = True
+        bake_settings.use_pass_indirect = True
+        bake_settings.use_pass_color = False
+        # The should be small because otherwise it could overwrite UV islands
+        bake_settings.margin = 1
+        # Not sure whether this has any influence
+        bake_settings.image_settings.file_format = 'HDR'
+        context.scene.render.image_settings.file_format = 'HDR'
+        bpy.ops.object.bake(type='DIFFUSE')
+        # After baking is done, return everything back to normal
+        context.scene.cycles.samples = samples_tmp
+        context.scene.render.engine = render_engine_tmp
+        # Pack all newly created or updated images
+        for node in lightmap_texture_nodes:
+            # file_path = bpy.path.abspath("//"+node.image.name+".hdr")
+            # node.image.save_render(file_path)
+            node.image.file_format = 'HDR'
+            node.image.pack()
         return {'FINISHED'}
     
     def invoke(self, context, event):
@@ -114,6 +147,7 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
     
     def setup_moz_lightmap_nodes(self, node_tree):
+        ''' Returns the lightmap texture node of the newly created setup '''
         mat_nodes = node_tree.nodes
         # This function gets called when no lightmap node is present
         lightmap_node = mat_nodes.new(type="moz_lightmap.node")
@@ -134,6 +168,8 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
 
         # the image texture node needs to be the active one for baking
         node_tree.nodes.active = lightmap_texture_node
+
+        return lightmap_texture_node
 
 
 def register():
