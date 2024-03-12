@@ -150,6 +150,11 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
         return {'FINISHED'}
     
     def invoke(self, context, event):
+        if bpy.data.is_saved == False:
+            message_save_blend = "You ned to save the .blend file before running this operator."
+            self.report({'WARNING'}, message_save_blend)
+            self.popup_error_message(message_save_blend)
+            return {'CANCELLED'}
         # needed to get the dialoge with the intensity
         return context.window_manager.invoke_props_dialog(self)
     
@@ -177,6 +182,12 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
         node_tree.nodes.active = lightmap_texture_node
 
         return lightmap_texture_node
+    
+    def popup_error_message(self, message):
+        def draw(self, context):
+            layout = self.layout
+            layout.label(text=message)
+        bpy.context.window_manager.popup_menu(draw, title="Hubs Lightmap Baker Error", icon='ERROR')
 
 
 def register():
