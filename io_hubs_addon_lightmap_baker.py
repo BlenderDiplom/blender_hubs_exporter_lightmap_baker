@@ -21,7 +21,7 @@ bl_info = {
 class HubsPanel(bpy.types.Panel):
     """Creates a Panel in the Object properties window"""
     bl_label = "Hubs Lightmap Baker"
-    bl_idname = "OBJECT_PT_hubs"
+    bl_idname = "OBJECT_PT_hubs_lightmap_baker"
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "object"
