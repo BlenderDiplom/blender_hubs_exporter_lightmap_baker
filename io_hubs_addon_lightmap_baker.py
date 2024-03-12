@@ -6,7 +6,7 @@ bl_info = {
     "author": "BlenderDiplom",
     "description": "Tools for automatically baking lightmaps to be used with the Blender hubs exporter.",
     "blender": (3, 6, 0),
-    "version": (0, 1, 0, "alpha_build"),
+    "version": (0, 2, 1, "beta_build"),
     "location": "Object Properties -> Hubs Lightmap Baker",
     "wiki_url": "",
     "tracker_url": "",
@@ -94,10 +94,15 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
         # Gather all materials on the selected objects
         materials = []
         for obj in mesh_objs:
-            # TODO: Make more efficient
-            for slot in obj.material_slots:
-                if slot.material not in materials:
-                    materials.append(slot.material)
+            if len(obj.material_slots) >= 1:
+                # TODO: Make more efficient
+                for slot in obj.material_slots:
+                    if slot.material not in materials:
+                        materials.append(slot.material)
+            else:
+                # an object without materials should not be selected when running the bake operator
+                print("Object " + obj.name + " does not have material slots, removing from selection")
+                obj.select_set(False)
         # Check for the required nodes and set them up if not present
         lightmap_texture_nodes = []
         for mat in materials:
@@ -136,10 +141,12 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
         context.scene.render.engine = render_engine_tmp
         # Pack all newly created or updated images
         for node in lightmap_texture_nodes:
-            # file_path = bpy.path.abspath("//"+node.image.name+".hdr")
+            file_path = bpy.path.abspath("//"+node.image.name+".hdr")
             # node.image.save_render(file_path)
+            node.image.filepath_raw = file_path
             node.image.file_format = 'HDR'
-            node.image.pack()
+            node.image.save()
+            # node.image.pack()
         return {'FINISHED'}
     
     def invoke(self, context, event):
