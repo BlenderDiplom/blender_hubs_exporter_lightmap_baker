@@ -141,12 +141,14 @@ class OBJECT_OT_BakeLightmaps(bpy.types.Operator):
         context.scene.render.engine = render_engine_tmp
         # Pack all newly created or updated images
         for node in lightmap_texture_nodes:
-            file_path = bpy.path.abspath("//"+node.image.name+".hdr")
+            # TODO: use bpy.app.tempdir
+            # TODO: reflection_probe.py line 300-306
+            file_path = bpy.path.abspath(bpy.app.tempdir+node.image.name+".hdr")
             # node.image.save_render(file_path)
             node.image.filepath_raw = file_path
             node.image.file_format = 'HDR'
             node.image.save()
-            # node.image.pack()
+            node.image.pack()
         return {'FINISHED'}
     
     def invoke(self, context, event):
